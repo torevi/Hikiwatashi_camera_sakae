@@ -106,7 +106,13 @@
       // 「組」という文字が含まれていたら、そこで真っ二つに切る
       if (qrText.indexOf("組") !== -1) {
         let splitIndex = qrText.indexOf("組") + 1;
-        qrClass = qrText.substring(0, splitIndex);          // 最初から「組」まで（例: １年１組）
+        let rawClass = qrText.substring(0, splitIndex);          // 最初から「組」まで
+        
+        // ★追加：半角数字が含まれていた場合、強制的に全角数字に変換する
+        qrClass = rawClass.replace(/[0-9]/g, function(s) {
+          return String.fromCharCode(s.charCodeAt(0) + 0xFEE0);
+        });
+
         qrName = qrText.substring(splitIndex).trim();       // 「組」のあと全部（例: オオサワ　カエデ）
       } 
       // たんぽぽクラスの場合
