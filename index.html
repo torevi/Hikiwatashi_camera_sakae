@@ -2,142 +2,97 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>児童引き渡し - QR読み取り</title>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>児童引き渡し受付</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    :root {
-      --primary: #1976d2;
-      --success: #2e7d32;
-      --error: #d32f2f;
-      --bg: #f2f5f7;
-      --text: #333333;
-    }
-    body {
-      margin: 0; padding: 0; background-color: var(--bg);
-      font-family: 'Helvetica Neue', Arial, sans-serif;
-      color: var(--text);
-    }
-    .header {
-      background-color: var(--primary); color: white; padding: 15px;
-      text-align: center; font-size: 1.2rem; font-weight: bold;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .container {
-      padding: 20px; max-width: 600px; margin: 0 auto;
-      display: flex; flex-direction: column; align-items: center;
-    }
-    #reader {
-      width: 100%; border-radius: 12px; overflow: hidden;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15); background: #000;
-      min-height: 250px;
-    }
-    .controls {
-      margin-top: 20px; display: flex; gap: 15px; width: 100%;
-    }
-    .btn {
-      flex: 1; padding: 18px 0; font-size: 1.1rem; font-weight: bold;
-      border: none; border-radius: 8px; cursor: pointer; text-align: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: opacity 0.2s;
-    }
-    .btn:active { opacity: 0.7; transform: translateY(2px); }
-    .btn-start { background-color: var(--primary); color: white; }
-    .btn-stop { background-color: #e0e0e0; color: #333; }
-    
-    #status-card {
-      margin-top: 20px; width: 100%; padding: 20px; border-radius: 8px;
-      text-align: center; font-size: 1.2rem; font-weight: bold;
-      box-sizing: border-box; background: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .status-wait { color: var(--text); border: 2px solid transparent; }
-    .status-loading { color: var(--primary); border: 2px solid var(--primary); background: #e3f2fd; }
-    .status-success { color: var(--success); border: 2px solid var(--success); background: #e8f5e9; }
-    .status-error { color: var(--error); border: 2px solid var(--error); background: #ffebee; }
+    :root { --primary: #1976d2; --success: #2e7d32; --bg: #f2f5f7; }
+    body { margin: 0; background: var(--bg); font-family: sans-serif; padding-bottom: 50px; }
+    .header { background: var(--primary); color: white; padding: 15px; text-align: center; font-weight: bold; }
+    .container { padding: 15px; max-width: 600px; margin: 0 auto; }
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
+    .status-card { margin-top: 15px; padding: 15px; border-radius: 8px; background: white; text-align: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .success { color: var(--success); border: 2px solid var(--success); background: #e8f5e9; }
+    .manual-section { margin-top: 30px; background: white; padding: 15px; border-radius: 8px; }
+    .class-group { margin-bottom: 20px; }
+    .button-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+    .name-btn { padding: 10px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; }
   </style>
 </head>
 <body>
 
-  <div class="header">児童引き渡し受付システム</div>
-  
-  <div class="container">
-    <div id="reader"></div>
-    
-    <div class="controls">
-      <button id="btn-start" class="btn btn-start" onclick="startScanner()">カメラ起動</button>
-      <button id="btn-stop" class="btn btn-stop" onclick="stopScanner()">停止</button>
-    </div>
+<div class="header">お迎え受付 (QR & 名前ボタン)</div>
+<div class="container">
+  <div id="reader"></div>
+  <div id="status-card" class="status-card">カメラ起動中...</div>
 
-    <div id="status-card" class="status-wait">
-      「カメラ起動」を押し、QRコードをかざしてください
-    </div>
+  <div class="manual-section">
+    <div style="font-weight:bold; margin-bottom:10px;">QRがない方は名前をタップ</div>
+    <div id="manual-buttons">名簿読み込み中...</div>
   </div>
+</div>
 
-  <script>
-    // 教えていただいたGASのURLをセット済みです
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxU9ET-mJDkXNcrKhVO5rZmoFyAxUE-TtbNAX9zpw_EdqB0YTUuurq20YZwzCzu_AZG/exec";
-    
-    let html5QrCode;
-    let isScanning = false;
+<script>
+  // ★重要：ここにGASでデプロイしたURLを貼り付けてください
+  const GAS_URL = "https://script.google.com/macros/s/AKfycb...あなたのURL.../exec"; 
 
-    function setStatus(text, type) {
-      const card = document.getElementById('status-card');
-      card.innerText = text;
-      card.className = ''; 
-      card.classList.add('status-' + type);
-    }
+  let html5QrCode;
 
-    function onScanSuccess(decodedText, decodedResult) {
-      if (!isScanning) return;
-      
-      stopScanner();
-      setStatus(`読取成功: ${decodedText}\nデータ送信中...`, 'loading');
+  // データ送信
+  function sendData(id, name) {
+    const card = document.getElementById('status-card');
+    card.innerText = `送信中: ${name}...`;
+    // GitHubからGASを呼び出す時はこの形式
+    fetch(`${GAS_URL}?studentId=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}`)
+      .then(() => {
+        card.innerText = `【受付完了】\n${name} さん`;
+        card.classList.add('success');
+        setTimeout(() => { card.classList.remove('success'); card.innerText="QRをかざしてください"; }, 3000);
+      })
+      .catch(err => alert("通信エラー"));
+  }
 
-      fetch(`${GAS_URL}?studentId=${encodeURIComponent(decodedText)}`)
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            setStatus(`受付完了！\n学籍番号: ${decodedText}`, 'success');
-          } else {
-            setStatus(`エラー: ${data.error}`, 'error');
-          }
-          setTimeout(startScanner, 3000);
-        })
-        .catch(error => {
-          setStatus('通信エラーが発生しました。\n電波状況を確認してください。', 'error');
-          setTimeout(startScanner, 3000);
-        });
-    }
+  // QR成功時
+  function onScanSuccess(decodedText) {
+    const params = decodedText.split(',');
+    sendData(params[0], params[1] || "不明");
+  }
 
-    function startScanner() {
-      if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("reader");
-      }
-      
-      setStatus('QRコードをかざしてください', 'wait');
-      
-      html5QrCode.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        onScanSuccess,
-        (errorMessage) => { }
-      ).then(() => {
-        isScanning = true;
-      }).catch((err) => {
-        setStatus('カメラの起動に失敗しました。権限を確認してください。', 'error');
+  // 名簿ボタン作成
+  function loadRoster() {
+    fetch(`${GAS_URL}?action=getRoster`)
+      .then(res => res.json())
+      .then(roster => {
+        const container = document.getElementById('manual-buttons');
+        container.innerHTML = '';
+        const groups = roster.reduce((acc, obj) => {
+          if (!acc[obj.className]) acc[obj.className] = [];
+          acc[obj.className].push(obj); return acc;
+        }, {});
+
+        for (let className in groups) {
+          const groupDiv = document.createElement('div');
+          groupDiv.className = 'class-group';
+          groupDiv.innerHTML = `<div style="font-size:0.8rem; color:#666;">${className}</div>`;
+          const grid = document.createElement('div');
+          grid.className = 'button-grid';
+          groups[className].forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = 'name-btn'; btn.innerText = p.name;
+            btn.onclick = () => { if(confirm(p.name + 'さんを受付しますか？')) sendData(p.studentId, p.name); };
+            grid.appendChild(btn);
+          });
+          groupDiv.appendChild(grid);
+          container.appendChild(groupDiv);
+        }
       });
-    }
+  }
 
-    function stopScanner() {
-      if (html5QrCode && isScanning) {
-        html5QrCode.stop().then(() => {
-          isScanning = false;
-          setStatus('カメラを停止しました', 'wait');
-        }).catch((err) => {
-          console.error("停止エラー", err);
-        });
-      }
-    }
-  </script>
+  window.onload = () => {
+    html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess);
+    loadRoster();
+  };
+</script>
 </body>
 </html>
