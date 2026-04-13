@@ -37,8 +37,8 @@
   </div>
 </div>
 <script>
-  // ★重要：ここに新しくデプロイしたGASのURLを貼り付けてください
-  const GAS_URL = "ここにデプロイしたGASのURLを貼る"; 
+  // ★いただいた本物のURLをセットしました
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbxU9ET-mJDkXNcrKhVO5rZmoFyAxUE-TtbNAX9zpw_EdqB0YTUuurq20YZwzCzu_AZG/exec"; 
 
   let html5QrCode;
   function sendData(className, name) {
@@ -86,6 +86,9 @@
           });
           nameBox.appendChild(grid);
         });
+      })
+      .catch(err => {
+        document.getElementById('class-tabs').innerText = "名簿の読み込みに失敗しました。";
       });
   }
 
@@ -93,6 +96,8 @@
     html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => {
       html5QrCode.pause(true); sendData("QR読込", txt); 
+    }).catch(err => {
+      document.getElementById('status-card').innerText = "カメラを起動してください";
     });
     loadRoster();
   };
