@@ -37,13 +37,14 @@
   </div>
 </div>
 <script>
-  // ★成功した本物のGAS URLをセット済みです。もう書き換えないでください！
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxU9ET-mJDkXNcrKhVO5rZmoFyAxUE-TtbNAX9zpw_EdqB0YTUuurq20YZwzCzu_AZG/exec"; 
 
   let html5QrCode;
+  
+  // データ送信関数
   function sendData(className, name) {
     const card = document.getElementById('status-card');
-    card.innerText = `送信中: ${name}...`;
+    card.innerText = `送信中: ${className} ${name}...`;
     card.className = 'status-card';
     fetch(`${GAS_URL}?className=${encodeURIComponent(className)}&name=${encodeURIComponent(name)}`)
       .then(res => res.json())
@@ -55,6 +56,7 @@
       .catch(err => { card.innerText = "エラー: 再読み込みしてください"; card.className = 'status-card error'; });
   }
 
+  // 名簿ボタン作成関数
   function loadRoster() {
     fetch(`${GAS_URL}?action=getRoster`)
       .then(res => res.json())
@@ -92,13 +94,23 @@
       });
   }
 
+  // 初期起動
   window.onload = () => {
     html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => {
-      html5QrCode.pause(true); sendData("QR読込", txt); 
+      html5QrCode.pause(true); 
+      
+      // ★修正箇所：QRコードの文字（「1年1組 オダギ」など）をスペースやカンマで分割する
+      const parts = txt.split(/[ 　,、]+/); 
+      const qrClass = parts[0] || "不明";
+      const qrName = parts.slice(1).join(" ") || txt; // 残りの文字を名前にする
+      
+      sendData(qrClass, qrName); // 正しく分割したものを送信！
+      
     }).catch(err => {
       document.getElementById('status-card').innerText = "カメラを起動してください";
     });
+    
     loadRoster();
   };
 </script>
