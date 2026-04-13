@@ -37,7 +37,6 @@
   </div>
 </div>
 <script>
-  // GASのURLはそのままです
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxU9ET-mJDkXNcrKhVO5rZmoFyAxUE-TtbNAX9zpw_EdqB0YTUuurq20YZwzCzu_AZG/exec"; 
 
   let html5QrCode;
@@ -98,16 +97,22 @@
     html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => {
       html5QrCode.pause(true); 
       
-      // ★今回の修正箇所：文字列から「クラス」と「名前」を強制的に分離する
-      // 先頭が「1〜6年X組」または「たんぽぽ」であれば、そこで真っ二つに割る
-      const match = txt.match(/^([1-6]年[0-9]+組|たんぽぽ)(.*)/);
+      // 前後の無駄な空白を消す
+      const cleanTxt = txt.trim();
+      
+      // 全角(１〜６)・半角(1~6)どちらでも対応できる最強の分割ルール
+      const match = cleanTxt.match(/^([1-6１-６]年[0-9０-９]+組|たんぽぽ)[\s　]*(.*)/);
       
       let qrClass = "不明";
-      let qrName = txt; // 万が一マッチしなかった場合はそのままにする
+      let qrName = cleanTxt;
 
       if (match) {
-        qrClass = match[1]; // 例: "1年1組"
-        qrName = match[2].trim(); // 例: "オオサワ　カエデ" （前後の無駄な空白があれば消す）
+        qrClass = match[1];
+        // 名簿に合わせて、全角数字だった場合は半角に変換する
+        qrClass = qrClass.replace(/[０-９]/g, function(s) {
+            return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+        });
+        qrName = match[2].trim(); // 残りの文字を名前にする
       }
       
       sendData(qrClass, qrName);
