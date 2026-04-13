@@ -1,79 +1,101 @@
-<style>
-  /* ...既存のスタイル... */
-  .class-tab-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-  .class-tab { padding: 10px 20px; background: #eee; border-radius: 20px; cursor: pointer; font-weight: bold; }
-  .class-tab.active { background: var(--primary); color: white; }
-  .name-grid { display: none; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-  .name-grid.active { display: grid; }
-</style>
-
-<div class="manual-section">
-  <div class="section-title">手動登録（クラスを選択してください）</div>
-  <div id="class-tabs" class="class-tab-container">読み込み中...</div>
-  <div id="name-containers"></div>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>児童引き渡し受付</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    :root { --primary: #1976d2; --success: #2e7d32; --error: #d32f2f; --bg: #f2f5f7; }
+    body { margin: 0; background: var(--bg); font-family: sans-serif; padding-bottom: 50px; }
+    .header { background: var(--primary); color: white; padding: 15px; text-align: center; font-weight: bold; }
+    .container { padding: 15px; max-width: 600px; margin: 0 auto; }
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 250px; }
+    .status-card { margin-top: 15px; padding: 20px; border-radius: 8px; background: white; text-align: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 60px; display: flex; align-items: center; justify-content: center; }
+    .success { color: var(--success); border: 2px solid var(--success); background: #e8f5e9; }
+    .error { color: var(--error); border: 2px solid var(--error); background: #ffebee; }
+    .manual-section { margin-top: 30px; background: white; padding: 15px; border-radius: 8px; }
+    .section-title { border-left: 5px solid var(--primary); padding-left: 10px; margin-bottom: 15px; font-weight: bold; color: var(--primary); }
+    .class-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .tab { padding: 10px 15px; background: #eee; border-radius: 20px; cursor: pointer; font-size: 0.9rem; font-weight: bold; }
+    .tab.active { background: var(--primary); color: white; }
+    .name-grid { display: none; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+    .name-grid.active { display: grid; }
+    .name-btn { padding: 12px 5px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.9rem; }
+    .name-btn:active { background: #e3f2fd; }
+  </style>
+</head>
+<body>
+<div class="header">お迎え受付システム</div>
+<div class="container">
+  <div id="reader"></div>
+  <div id="status-card" class="status-card">カメラ起動中...</div>
+  <div class="manual-section">
+    <div class="section-title">手動受付（クラスを選択）</div>
+    <div id="class-tabs" class="class-tabs">名簿を読み込み中...</div>
+    <div id="name-containers"></div>
+  </div>
 </div>
-
 <script>
-  const GAS_URL = "あなたのGASのURL"; // ★必ず更新してデプロイ！
+  // ★重要：ここに新しくデプロイしたGASのURLを貼り付けてください
+  const GAS_URL = "ここにデプロイしたGASのURLを貼る"; 
 
+  let html5QrCode;
   function sendData(className, name) {
     const card = document.getElementById('status-card');
     card.innerText = `送信中: ${name}...`;
+    card.className = 'status-card';
     fetch(`${GAS_URL}?className=${encodeURIComponent(className)}&name=${encodeURIComponent(name)}`)
       .then(res => res.json())
       .then(data => {
         card.innerText = `【完了】${name}さん`;
         card.className = 'status-card success';
-        setTimeout(() => { card.className = 'status-card'; card.innerText = "QRをかざしてください"; }, 3000);
-      });
+        setTimeout(() => { card.className = 'status-card'; card.innerText = "QRをかざしてください"; if(html5QrCode) html5QrCode.resume(); }, 3000);
+      })
+      .catch(err => { card.innerText = "エラー: 再読み込みしてください"; card.className = 'status-card error'; });
   }
 
   function loadRoster() {
     fetch(`${GAS_URL}?action=getRoster`)
       .then(res => res.json())
       .then(roster => {
-        const tabContainer = document.getElementById('class-tabs');
-        const nameContainer = document.getElementById('name-containers');
-        tabContainer.innerHTML = '';
-        nameContainer.innerHTML = '';
-
-        // クラスごとに整理
+        const tabBox = document.getElementById('class-tabs');
+        const nameBox = document.getElementById('name-containers');
+        tabBox.innerHTML = ''; nameBox.innerHTML = '';
         const groups = roster.reduce((acc, obj) => {
           if (!acc[obj.className]) acc[obj.className] = [];
           acc[obj.className].push(obj.name);
           return acc;
         }, {});
-
-        Object.keys(groups).forEach((className, index) => {
-          // クラスボタン作成
+        Object.keys(groups).forEach((className, i) => {
           const tab = document.createElement('div');
-          tab.className = 'class-tab';
-          tab.innerText = className;
+          tab.className = 'tab'; tab.innerText = className;
           tab.onclick = () => {
-            document.querySelectorAll('.class-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.name-grid').forEach(g => g.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById('grid-' + index).classList.add('active');
+            tab.classList.add('active'); document.getElementById('grid-'+i).classList.add('active');
           };
-          tabContainer.appendChild(tab);
-
-          // 名前ボタンのグリッド作成
+          tabBox.appendChild(tab);
           const grid = document.createElement('div');
-          grid.id = 'grid-' + index;
-          grid.className = 'name-grid';
+          grid.id = 'grid-'+i; grid.className = 'name-grid';
           groups[className].forEach(name => {
             const btn = document.createElement('button');
-            btn.className = 'name-btn';
-            btn.innerText = name;
-            btn.onclick = () => { if(confirm(`${name}さんを受付しますか？`)) sendData(className, name); };
+            btn.className = 'name-btn'; btn.innerText = name;
+            btn.onclick = () => { if(confirm(name+'さんを受付しますか？')) sendData(className, name); };
             grid.appendChild(btn);
           });
-          nameContainer.appendChild(grid);
+          nameBox.appendChild(grid);
         });
-      })
-      .catch(err => {
-        document.getElementById('class-tabs').innerText = "名簿の取得に失敗しました。GASのデプロイ設定を確認してください。";
       });
   }
-  // window.onload で loadRoster() を実行
+
+  window.onload = () => {
+    html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => {
+      html5QrCode.pause(true); sendData("QR読込", txt); 
+    });
+    loadRoster();
+  };
 </script>
+</body>
+</html>
