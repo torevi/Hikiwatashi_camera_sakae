@@ -2,95 +2,142 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>児童引き渡し受付</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    :root { --primary: #1976d2; --success: #2e7d32; --bg: #f2f5f7; }
-    body { margin: 0; background: var(--bg); font-family: sans-serif; padding-bottom: 50px; }
+    :root { --primary: #1976d2; --success: #2e7d32; --error: #d32f2f; --bg: #f2f5f7; }
+    body { margin: 0; padding: 0; background: var(--bg); font-family: sans-serif; padding-bottom: 50px; }
     .header { background: var(--primary); color: white; padding: 15px; text-align: center; font-weight: bold; }
     .container { padding: 15px; max-width: 600px; margin: 0 auto; }
-    #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
-    .status-card { margin-top: 15px; padding: 15px; border-radius: 8px; background: white; text-align: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 250px; }
+    
+    .status-card { margin-top: 15px; padding: 20px; border-radius: 8px; background: white; text-align: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 60px; display: flex; align-items: center; justify-content: center; }
     .success { color: var(--success); border: 2px solid var(--success); background: #e8f5e9; }
-    .manual-section { margin-top: 30px; background: white; padding: 15px; border-radius: 8px; }
-    .class-group { margin-bottom: 20px; }
-    .button-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
-    .name-btn { padding: 10px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; }
+    .error { color: var(--error); border: 2px solid var(--error); background: #ffebee; }
+
+    /* 手動ボタンエリア */
+    .manual-section { margin-top: 30px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .section-title { border-left: 5px solid var(--primary); padding-left: 10px; margin-bottom: 15px; font-weight: bold; color: var(--primary); }
+    .class-group { margin-bottom: 25px; border-bottom: 1px dashed #eee; padding-bottom: 10px; }
+    .class-name { background: #f0f0f0; padding: 4px 12px; border-radius: 15px; font-size: 0.85rem; font-weight: bold; color: #555; margin-bottom: 10px; display: inline-block; }
+    .button-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+    .name-btn { padding: 12px 5px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.9rem; transition: 0.2s; }
+    .name-btn:active { background: #e3f2fd; transform: scale(0.95); }
   </style>
 </head>
 <body>
 
-<div class="header">お迎え受付 (QR & 名前ボタン)</div>
+<div class="header">お迎え受付システム</div>
+
 <div class="container">
   <div id="reader"></div>
   <div id="status-card" class="status-card">カメラ起動中...</div>
 
   <div class="manual-section">
-    <div style="font-weight:bold; margin-bottom:10px;">QRがない方は名前をタップ</div>
-    <div id="manual-buttons">名簿読み込み中...</div>
+    <div class="section-title">QRコードがない場合（手動受付）</div>
+    <div id="manual-buttons">名簿データを読み込んでいます...</div>
   </div>
 </div>
 
 <script>
-  // ★重要：ここにGASでデプロイしたURLを貼り付けてください
+  // ★重要：ここに新しくデプロイしたGASのURLを貼り付けてください
   const GAS_URL = "https://script.google.com/macros/s/AKfycb...あなたのURL.../exec"; 
-
+  
   let html5QrCode;
 
-  // データ送信
+  // データ送信処理（QR・手動共通）
   function sendData(id, name) {
     const card = document.getElementById('status-card');
-    card.innerText = `送信中: ${name}...`;
-    // GitHubからGASを呼び出す時はこの形式
-    fetch(`${GAS_URL}?studentId=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}`)
-      .then(() => {
-        card.innerText = `【受付完了】\n${name} さん`;
-        card.classList.add('success');
-        setTimeout(() => { card.classList.remove('success'); card.innerText="QRをかざしてください"; }, 3000);
+    card.innerText = `送信中: ${name} さん...`;
+    card.className = 'status-card';
+
+    // GASのAPIを叩く
+    fetch(`${GAS_URL}?studentId=${encodeURIComponent(id)}`)
+      .then(res => res.json())
+      .then(data => {
+        if(data.success) {
+          card.innerText = `【受付完了】\n${name} さん`;
+          card.classList.add('success');
+        } else {
+          card.innerText = `エラー: ${data.error}`;
+          card.classList.add('error');
+        }
+        // 3秒後に表示を戻す
+        setTimeout(() => {
+          card.classList.remove('success', 'error');
+          card.innerText = "QRコードをかざしてください";
+          if(html5QrCode) html5QrCode.resume();
+        }, 3000);
       })
-      .catch(err => alert("通信エラー"));
+      .catch(err => {
+        card.innerText = "通信エラーが発生しました";
+        card.classList.add('error');
+      });
   }
 
-  // QR成功時
+  // QR読み取り成功時
   function onScanSuccess(decodedText) {
-    const params = decodedText.split(',');
-    sendData(params[0], params[1] || "不明");
+    // QRの中身が「学籍番号」のみの場合、そのまま送信
+    // もし「番号,名前」の形式なら split(',') などで処理可能ですが、
+    // 今回のGASはstudentIdから名簿を引くので、IDだけでOK
+    if(html5QrCode) html5QrCode.pause(true); 
+    sendData(decodedText, "QR読込中");
   }
 
-  // 名簿ボタン作成
+  // 手動ボタン用の名簿をGASから取得して生成
   function loadRoster() {
     fetch(`${GAS_URL}?action=getRoster`)
       .then(res => res.json())
       .then(roster => {
         const container = document.getElementById('manual-buttons');
         container.innerHTML = '';
+        
+        // クラスごとにグループ化
         const groups = roster.reduce((acc, obj) => {
           if (!acc[obj.className]) acc[obj.className] = [];
-          acc[obj.className].push(obj); return acc;
+          acc[obj.className].push(obj);
+          return acc;
         }, {});
 
+        // クラスごとのボタン配置
         for (let className in groups) {
           const groupDiv = document.createElement('div');
           groupDiv.className = 'class-group';
-          groupDiv.innerHTML = `<div style="font-size:0.8rem; color:#666;">${className}</div>`;
+          groupDiv.innerHTML = `<div class="class-name">${className}</div>`;
+          
           const grid = document.createElement('div');
           grid.className = 'button-grid';
-          groups[className].forEach(p => {
+          
+          groups[className].forEach(person => {
             const btn = document.createElement('button');
-            btn.className = 'name-btn'; btn.innerText = p.name;
-            btn.onclick = () => { if(confirm(p.name + 'さんを受付しますか？')) sendData(p.studentId, p.name); };
+            btn.className = 'name-btn';
+            btn.innerText = person.name;
+            btn.onclick = () => {
+              if(confirm(`${person.name}さんを受付しますか？`)) {
+                sendData(person.studentId, person.name);
+              }
+            };
             grid.appendChild(btn);
           });
+          
           groupDiv.appendChild(grid);
           container.appendChild(groupDiv);
         }
+      })
+      .catch(err => {
+        document.getElementById('manual-buttons').innerText = "名簿の読み込みに失敗しました。";
       });
   }
 
+  // 初期化
   window.onload = () => {
     html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess);
+    html5QrCode.start(
+      { facingMode: "environment" }, 
+      { fps: 10, qrbox: { width: 250, height: 250 } }, 
+      onScanSuccess
+    );
     loadRoster();
   };
 </script>
